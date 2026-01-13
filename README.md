@@ -120,63 +120,59 @@ local Methods = {
 		SafeSend(string.upper(Message) .. " !")
 	end,
 }
+
 -- ══════════════════════════════════════
---              Functions (Corrigidas)
+--              Functions
 -- ══════════════════════════════════════
+local function Listen(Name, Element)
+	if Element:GetAttribute("IntBox") then
+		table.insert(Connections,
+			Element:GetPropertyChangedSignal("Text"):Connect(function()
+				Element.Text = string.gsub(Element.Text, "[^%d]", "")
+			end)
+		)
+	end
+
+	table.insert(Connections,
+		Element.FocusLost:Connect(function()
+			if not Element.Text or string.match(Element.Text, "^%s*$") then return end
+			Settings.Config[Name] = tonumber(Element.Text)
+		end)
+	)
+end
 
 local function EndThread()
-    if Threading then
-        -- Se o thread ainda estiver rodando, cancelamos
-        task.cancel(Threading)
-        Threading = nil
-    end
-    -- Resetamos o estado para que o botão "Play" saiba que pode iniciar de novo
-    Settings.Started = false
-    FinishedThread = false
+	if Threading then
+		task.cancel(Threading)
+		Threading = nil
+		FinishedThread = false
+		Settings.Started = false
+	end
+end
+
+local function DoJJ(MethodName, Number)
+	local Success, String = Extenso:Convert(Number)
+	if not Success then return end
+
+	local Method = Methods[MethodName]
+	if Method then
+		Method(String)
+	end
 end
 
 local function StartThread()
-    local Config = Settings.Config
-    if not Config.Start or not Config.End then 
-        Settings.Started = false -- Resetar caso falte config
-        return 
-    end
+	local Config = Settings.Config
+	if not Config.Start or not Config.End then return end
+	if Threading then EndThread() return end
 
-    Threading = task.spawn(function()
-        for i = Config.Start, Config.End do
-            DoJJ("Normal", i)
-        end
-        
-        -- IMPORTANTE: Aguarda as mensagens terminarem de ser enviadas 
-        -- antes de permitir um novo início automático
-        repeat task.wait() until #ChatQueue == 0
-        
-        FinishedThread = true
-        EndThread() -- Finaliza o estado ao chegar no fim do loop
-    end)
+	Threading = task.spawn(function()
+		for i = Config.Start, Config.End do
+			DoJJ("Normal", i)
+		end
+		FinishedThread = true
+		EndThread()
+	end)
 end
-
--- ══════════════════════════════════════
---                Main
--- ══════════════════════════════════════
-
--- ... (resto do código anterior)
-
-table.insert(Connections, UIElements.Play.MouseButton1Up:Connect(function()
-    if not Settings.Config.Start or not Settings.Config.End then 
-        return 
-    end
-
-    if not Settings.Started then
-        -- Inicia a execução
-        Settings.Started = true
-        StartThread()
-    else
-        -- Interrompe a execução manual
-        EndThread()
-    end
-end))
-
 
 -- ══════════════════════════════════════
 --                Main
