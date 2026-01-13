@@ -67,7 +67,7 @@ local Settings = {
 	Config = {
 		Start = nil,
 		End = nil,
-		Prefix = " !" -- PREFIXO CORRETO
+		Prefix = " !"
 	}
 }
 
@@ -76,9 +76,9 @@ local Settings = {
 -- ══════════════════════════════════════
 
 local function SafeJump()
-	if not Settings.Jump then return end
-	if not Char or not Char.Character then return end
-	Char:Jump()
+	if Settings.Jump and Char and Char.Character then
+		Char:Jump()
+	end
 end
 
 -- ══════════════════════════════════════
@@ -107,6 +107,20 @@ local Methods = {
 }
 
 -- ══════════════════════════════════════
+--            FUNÇÃO CHAVE (ESSENCIAL)
+-- ══════════════════════════════════════
+
+local function DoJJ(MethodName, Number, Prefix)
+	local success, text = Extenso:Convert(Number)
+	if not success then return end
+
+	local Method = Methods[MethodName]
+	if not Method then return end
+
+	Method(text, Prefix)
+end
+
+-- ══════════════════════════════════════
 --              Thread
 -- ══════════════════════════════════════
 
@@ -115,7 +129,6 @@ local function EndThread(success)
 		task.cancel(Threading)
 		Threading = nil
 	end
-
 	FinishedThread = false
 	Settings.Started = false
 	Notification:Notify(success and 6 or 12)
@@ -130,10 +143,7 @@ local function StartThread()
 
 	Threading = task.spawn(function()
 		for i = tonumber(cfg.Start), tonumber(cfg.End) do
-			local ok, text = Extenso:Convert(i)
-			if ok then
-				Methods.Normal(text, cfg.Prefix)
-			end
+			DoJJ("Normal", i, cfg.Prefix)
 
 			if i ~= tonumber(cfg.End) then
 				task.wait(Options.Tempo)
@@ -154,29 +164,19 @@ UI:SetParent(Parent)
 
 Notification:SetParent(UI.getUI())
 
--- botão pular (100% corrigido)
+-- botão pular
 table.insert(Connections,
 	UIElements.Circle.MouseButton1Click:Connect(function()
 		Toggled = not Toggled
 		Settings.Jump = Toggled
 
-		if Toggled then
-			TweenService:Create(UIElements.Circle, TweenInfo.new(0.3), {
-				Position = UDim2.new(0.772, 0, 0.5, 0)
-			}):Play()
+		TweenService:Create(UIElements.Circle, TweenInfo.new(0.3), {
+			Position = Toggled and UDim2.new(0.772,0,0.5,0) or UDim2.new(0.22,0,0.5,0)
+		}):Play()
 
-			TweenService:Create(UIElements.Slide, TweenInfo.new(0.3), {
-				BackgroundColor3 = Color3.fromRGB(37, 150, 255)
-			}):Play()
-		else
-			TweenService:Create(UIElements.Circle, TweenInfo.new(0.3), {
-				Position = UDim2.new(0.22, 0, 0.5, 0)
-			}):Play()
-
-			TweenService:Create(UIElements.Slide, TweenInfo.new(0.3), {
-				BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-			}):Play()
-		end
+		TweenService:Create(UIElements.Slide, TweenInfo.new(0.3), {
+			BackgroundColor3 = Toggled and Color3.fromRGB(37,150,255) or Color3.fromRGB(20,20,20)
+		}):Play()
 	end)
 )
 
