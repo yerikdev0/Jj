@@ -1,203 +1,188 @@
 -- ══════════════════════════════════════
 --               Core
 -- ══════════════════════════════════════
-local Find = function(Table)
-	for _, Item in pairs(Table or {}) do
-		if typeof(Item) == "table" then
-			return Item
-		end
-	end
-end
 
-local Options = Find(({...})) or {
+local Options = {
 	Keybind = "Home",
-
+	Tempo = 0.8889,
+	Rainbow = false,
 	Language = {
 		UI = "pt-br",
 		Words = "pt-br"
 	},
-
-	Experiments = {},
-	Rainbow = false,
+	Experiments = {}
 }
 
-local Version = "2.2"
+local Version = " "
 local Parent = gethui() or game:GetService("CoreGui")
 
 local require = function(Name)
 	return loadstring(game:HttpGet(
-		string.format("https://raw.githubusercontent.com/Zv-yz/AutoJJs/main/%s.lua", Name)
+		"https://raw.githubusercontent.com/Zv-yz/AutoJJs/main/" .. Name .. ".lua"
 	))()
 end
 
 -- ══════════════════════════════════════
 --              Services
 -- ══════════════════════════════════════
+
+local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local LP = Players.LocalPlayer
 
 -- ══════════════════════════════════════
 --              Modules
 -- ══════════════════════════════════════
+
 local UI = require("UI")
 local Notification = require("Notification")
+
 local Extenso = require("Modules/Extenso")
 local Character = require("Modules/Character")
 local RemoteChat = require("Modules/RemoteChat")
 
 -- ══════════════════════════════════════
---        Chat Queue Controller
--- ══════════════════════════════════════
-local ChatQueue = {}
-local Sending = false
-
--- ⏱️ TEMPO FIXO ENTRE MENSAGENS
-local CHAT_INTERVAL = 0.8889
-
-local function ProcessQueue()
-	if Sending then return end
-	Sending = true
-
-	task.spawn(function()
-		while #ChatQueue > 0 do
-			local msg = table.remove(ChatQueue, 1)
-
-			pcall(function()
-				RemoteChat:Send(msg)
-			end)
-
-			local start = os.clock()
-			while os.clock() - start < CHAT_INTERVAL do
-				task.wait()
-			end
-		end
-		Sending = false
-	end)
-end
-
-local function SafeSend(message)
-	table.insert(ChatQueue, tostring(message))
-	ProcessQueue()
-end
-
--- ══════════════════════════════════════
 --              Constants
 -- ══════════════════════════════════════
+
 local Char = Character.new(LP)
 local UIElements = UI.UIElements
 local Connections = {}
 
-local Threading
+local Threading = nil
 local FinishedThread = false
+local Toggled = false
 
 local Settings = {
+	Keybind = Options.Keybind,
 	Started = false,
 	Jump = false,
-
 	Config = {
 		Start = nil,
 		End = nil,
+		Prefix = nil
 	}
 }
 
 -- ══════════════════════════════════════
+--           Funções Seguras
+-- ══════════════════════════════════════
+
+local function SafeJump()
+	if not Settings.Jump then return end
+	if not Char or not Char.Character then return end
+	Char:Jump()
+end
+
+local function SafeSend(text)
+	-- formato correto: ZERO ! mensagem
+	RemoteChat:Send("ZERO ! " .. tostring(text))
+end
+
+-- ══════════════════════════════════════
 --              Methods
 -- ══════════════════════════════════════
+
 local Methods = {
 
-	["Normal"] = function(Message)
-		if Settings.Jump then Char:Jump() end
-		SafeSend(string.upper(Message) .. " !")
+	Normal = function(Message)
+		SafeJump()
+		SafeSend(Message)
 	end,
 
-	["Lowercase"] = function(Message)
-		if Settings.Jump then Char:Jump() end
-		SafeSend(string.upper(Message) .. " !")
+	Lowercase = function(Message)
+		SafeJump()
+		SafeSend(string.lower(Message))
 	end,
 
-	["HJ"] = function(Message)
-		if Settings.Jump then Char:Jump() end
-		SafeSend(string.upper(Message) .. " !")
-	end,
+	HJ = function(Message)
+		for i = 1, #Message do
+			SafeJump()
+			SafeSend(string.sub(Message, i, i))
+			task.wait(Options.Tempo)
+		end
+	end
 }
 
 -- ══════════════════════════════════════
---              Functions
+--              Thread
 -- ══════════════════════════════════════
-local function Listen(Name, Element)
-	if Element:GetAttribute("IntBox") then
-		table.insert(Connections,
-			Element:GetPropertyChangedSignal("Text"):Connect(function()
-				Element.Text = string.gsub(Element.Text, "[^%d]", "")
-			end)
-		)
-	end
 
-	table.insert(Connections,
-		Element.FocusLost:Connect(function()
-			if not Element.Text or string.match(Element.Text, "^%s*$") then return end
-			Settings.Config[Name] = tonumber(Element.Text)
-		end)
-	)
-end
-
-local function EndThread()
+local function EndThread(success)
 	if Threading then
 		task.cancel(Threading)
 		Threading = nil
-		FinishedThread = false
-		Settings.Started = false
 	end
-end
 
-local function DoJJ(MethodName, Number)
-	local Success, String = Extenso:Convert(Number)
-	if not Success then return end
-
-	local Method = Methods[MethodName]
-	if Method then
-		Method(String)
-	end
+	FinishedThread = false
+	Settings.Started = false
+	Notification:Notify(success and 6 or 12)
 end
 
 local function StartThread()
-	local Config = Settings.Config
-	if not Config.Start or not Config.End then return end
-	if Threading then EndThread() return end
+	local cfg = Settings.Config
+	if not cfg.Start or not cfg.End then return end
+	if Threading then EndThread(false) return end
+
+	Notification:Notify(5)
 
 	Threading = task.spawn(function()
-		for i = Config.Start, Config.End do
-			DoJJ("Normal", i)
+		for i = tonumber(cfg.Start), tonumber(cfg.End) do
+			local ok, text = Extenso:Convert(i)
+			if ok then
+				Methods.Normal(text)
+			end
+			task.wait(Options.Tempo)
 		end
-		FinishedThread = true
-		EndThread()
+		EndThread(true)
 	end)
 end
 
 -- ══════════════════════════════════════
---                Main
+--              UI
 -- ══════════════════════════════════════
+
 UI:SetVersion(Version)
+UI:SetLanguage({})
 UI:SetRainbow(Options.Rainbow)
 UI:SetParent(Parent)
 
 Notification:SetParent(UI.getUI())
 
-for Name, Element in pairs(UIElements.Box) do
-	task.spawn(Listen, Name, Element)
-end
+-- botão de pulo (corrigido)
+table.insert(Connections,
+	UIElements.Circle.MouseButton1Click:Connect(function()
+		Toggled = not Toggled
+		Settings.Jump = Toggled
 
-table.insert(Connections, UIElements.Play.MouseButton1Up:Connect(function()
-	if not Settings.Config.Start or not Settings.Config.End then return end
+		if Toggled then
+			TweenService:Create(UIElements.Circle, TweenInfo.new(0.3), {
+				Position = UDim2.new(0.772, 0, 0.5, 0)
+			}):Play()
 
-	if not Settings.Started then
-		Settings.Started = true
-		StartThread()
-	else
-		EndThread()
-	end
-end))
+			TweenService:Create(UIElements.Slide, TweenInfo.new(0.3), {
+				BackgroundColor3 = Color3.fromRGB(37, 150, 255)
+			}):Play()
+		else
+			TweenService:Create(UIElements.Circle, TweenInfo.new(0.3), {
+				Position = UDim2.new(0.22, 0, 0.5, 0)
+			}):Play()
 
-if Notification then
-	Notification:SetupJJs()
-end
+			TweenService:Create(UIElements.Slide, TweenInfo.new(0.3), {
+				BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+			}):Play()
+		end
+	end)
+)
+
+-- botão play
+table.insert(Connections,
+	UIElements.Play.MouseButton1Up:Connect(function()
+		if not Settings.Started then
+			Settings.Started = true
+			StartThread()
+		else
+			EndThread(false)
+		end
+	end)
+)
