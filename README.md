@@ -2,7 +2,15 @@
 --               Core
 -- ══════════════════════════════════════
 
-local Options = {
+local Find = function(Table)
+	for _, Item in pairs(Table or {}) do
+		if typeof(Item) == "table" then
+			return Item
+		end
+	end
+end
+
+local Options = Find(({...})) or {
 	Keybind = "Home",
 	Tempo = 0.8889,
 	Rainbow = false,
@@ -13,7 +21,7 @@ local Options = {
 	Experiments = {}
 }
 
-local Version = " "
+local Version = "2.1"
 local Parent = gethui() or game:GetService("CoreGui")
 
 local require = function(Name)
@@ -36,7 +44,6 @@ local LP = Players.LocalPlayer
 
 local UI = require("UI")
 local Notification = require("Notification")
-
 local Extenso = require("Modules/Extenso")
 local Character = require("Modules/Character")
 local RemoteChat = require("Modules/RemoteChat")
@@ -60,7 +67,7 @@ local Settings = {
 	Config = {
 		Start = nil,
 		End = nil,
-		Prefix = nil
+		Prefix = " !" -- PREFIXO CORRETO
 	}
 }
 
@@ -74,31 +81,26 @@ local function SafeJump()
 	Char:Jump()
 end
 
-local function SafeSend(text)
-	-- formato correto: ZERO ! mensagem
-	RemoteChat:Send("ZERO ! " .. tostring(text))
-end
-
 -- ══════════════════════════════════════
 --              Methods
 -- ══════════════════════════════════════
 
 local Methods = {
 
-	Normal = function(Message)
+	Normal = function(Message, Prefix)
 		SafeJump()
-		SafeSend(Message)
+		RemoteChat:Send(Message .. Prefix)
 	end,
 
-	Lowercase = function(Message)
+	Lowercase = function(Message, Prefix)
 		SafeJump()
-		SafeSend(string.lower(Message))
+		RemoteChat:Send(string.lower(Message) .. Prefix)
 	end,
 
-	HJ = function(Message)
+	HJ = function(Message, Prefix)
 		for i = 1, #Message do
 			SafeJump()
-			SafeSend(string.sub(Message, i, i))
+			RemoteChat:Send(string.sub(Message, i, i) .. Prefix)
 			task.wait(Options.Tempo)
 		end
 	end
@@ -130,9 +132,12 @@ local function StartThread()
 		for i = tonumber(cfg.Start), tonumber(cfg.End) do
 			local ok, text = Extenso:Convert(i)
 			if ok then
-				Methods.Normal(text)
+				Methods.Normal(text, cfg.Prefix)
 			end
-			task.wait(Options.Tempo)
+
+			if i ~= tonumber(cfg.End) then
+				task.wait(Options.Tempo)
+			end
 		end
 		EndThread(true)
 	end)
@@ -149,7 +154,7 @@ UI:SetParent(Parent)
 
 Notification:SetParent(UI.getUI())
 
--- botão de pulo (corrigido)
+-- botão pular (100% corrigido)
 table.insert(Connections,
 	UIElements.Circle.MouseButton1Click:Connect(function()
 		Toggled = not Toggled
